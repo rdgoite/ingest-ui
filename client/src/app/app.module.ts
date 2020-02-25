@@ -60,13 +60,8 @@ import {AlertComponent} from './shared/components/alert/alert.component';
 import {LoaderService} from './shared/services/loader.service';
 import {FlattenService} from './shared/services/flatten.service';
 import {SchemaService} from './shared/services/schema.service';
-
-import {MetadataTableComponent} from './submission/metadata-table/metadata-table.component';
-
-import {MetadataFieldComponent} from './submission/metadata-field/metadata-field.component';
 import {AaiCallbackComponent} from './aai-callback/aai-callback.component';
 import {OidcInterceptor} from './aai/oidc-interceptor';
-
 
 @NgModule({
   declarations: [
@@ -91,9 +86,8 @@ import {OidcInterceptor} from './aai/oidc-interceptor';
     LoginComponent,
     OverviewComponent,
     AlertComponent,
-    MetadataTableComponent,
-    MetadataFieldComponent,
-    AaiCallbackComponent
+    AaiCallbackComponent,
+    AlertComponent
   ],
   imports: [
     NgbModule.forRoot(),
