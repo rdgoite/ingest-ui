@@ -1,12 +1,12 @@
-import {Component, OnInit} from '@angular/core';
-import {Observable} from "rxjs";
-import {IngestService} from "../shared/services/ingest.service";
-import {ActivatedRoute, Router} from "@angular/router";
-import {TimerObservable} from "rxjs/observable/TimerObservable";
-import {AlertService} from "../shared/services/alert.service";
-import {HttpErrorResponse} from "@angular/common/http";
+import {Component, OnDestroy, OnInit} from '@angular/core';
+import {Observable} from 'rxjs';
+import {IngestService} from '../shared/services/ingest.service';
+import {ActivatedRoute, Router} from '@angular/router';
+import {TimerObservable} from 'rxjs/observable/TimerObservable';
+import {AlertService} from '../shared/services/alert.service';
+import {HttpErrorResponse} from '@angular/common/http';
 import {SubmissionEnvelope} from '../shared/models/submissionEnvelope';
-import {LoaderService} from "../shared/services/loader.service";
+import {LoaderService} from '../shared/services/loader.service';
 
 
 @Component({
@@ -14,33 +14,36 @@ import {LoaderService} from "../shared/services/loader.service";
   templateUrl: './submission.component.html',
   styleUrls: ['./submission.component.scss']
 })
-export class SubmissionComponent implements OnInit {
-  submissionEnvelopeId: string;
-  submissionEnvelopeUuid: string;
-  projectUuid: string;
+export class SubmissionComponent implements OnInit, OnDestroy {
+  private MAX_ERRORS = 9;
 
-  submissionEnvelope$: Observable<any>;
-  submissionEnvelope;
-  submissionState: string;
 
-  activeTab: string;
+  private submissionEnvelope$: Observable<any>;
+  private submissionEnvelope;
+  private submissionEnvelopeId: string;
+  private submissionEnvelopeUuid: string;
+  private submissionState: string;
 
-  isValid: boolean;
-  isLinkingDone: boolean;
-  isSubmitted: boolean;
-  submitLink: string;
-  url:string;
+  private activeTab: string;
 
-  project: any;
+  private isValid: boolean;
+  private isLinkingDone: boolean;
+  private isSubmitted: boolean;
+  private submitLink: string;
+  private url: string;
 
-  projectName: string;
+  private project: Object;
+
+  private relatedProject: Object;
+  private relatedProjectName: string;
+  private relatedProjectUuid: string;
+
+  private manifest: Object;
+  private submissionErrors: any[];
 
   private alive: boolean;
   private pollInterval: number;
-  private MAX_ERRORS = 9;
 
-  manifest: Object;
-  submissionErrors: any[];
 
   constructor(
     private alertService: AlertService,
@@ -49,25 +52,25 @@ export class SubmissionComponent implements OnInit {
     private router: Router,
     private loaderService: LoaderService
   ) {
-      this.pollInterval = 4000; //4s
-      this.alive = true;
-      this.manifest = {};
+    this.pollInterval = 4000; // 4s
+    this.alive = true;
+    this.manifest = {};
   }
 
   ngOnInit() {
     this.route.queryParamMap.subscribe(queryParams => {
-      this.submissionEnvelopeUuid = queryParams.get("uuid")
+      this.submissionEnvelopeUuid = queryParams.get('uuid');
     });
 
     this.submissionEnvelopeId = this.route.snapshot.paramMap.get('id');
-    let tab = this.route.snapshot.paramMap.get('tab');
+    const tab = this.route.snapshot.paramMap.get('tab');
 
     this.activeTab = tab ? tab.toLowerCase() : '';
 
-    if(!this.submissionEnvelopeId && !this.submissionEnvelopeUuid){
-      this.projectUuid = this.route.snapshot.paramMap.get('projectUuid');
-      if(this.projectUuid){
-        this.getProject(this.projectUuid)
+    if (!this.submissionEnvelopeId && !this.submissionEnvelopeUuid) {
+      this.relatedProjectUuid = this.route.snapshot.paramMap.get('projectUuid');
+      if (this.relatedProjectUuid) {
+        this.getRelatedProject(this.relatedProjectUuid);
       }
     } else {
       this.pollSubmissionEnvelope();
@@ -76,74 +79,82 @@ export class SubmissionComponent implements OnInit {
     }
   }
 
-  ngOnDestroy(){
+  ngOnDestroy() {
     this.alive = false; // switches your IntervalObservable off
   }
 
-  pollSubmissionEnvelope(){
+  pollSubmissionEnvelope() {
     TimerObservable.create(0, this.pollInterval)
       .takeWhile(() => this.alive) // only fires when component is alive
       .subscribe(() => {
         this.getSubmissionEnvelope();
-        if(this.submissionEnvelope){
+        if (this.submissionEnvelope) {
           this.getSubmissionErrors();
           this.getSubmissionManifest();
         }
       });
   }
 
-  pollEntities(){
+  pollEntities() {
     TimerObservable.create(500, this.pollInterval)
       .takeWhile(() => this.alive) // only fires when component is alive
       .subscribe(() => {
-        if(this.submissionEnvelopeId){
+        if (this.submissionEnvelopeId) {
           this.getSubmissionProject(this.submissionEnvelopeId);
         }
       });
   }
 
-  checkIfValid(submission){
-    let status = submission['submissionState'];
-    let validStates = ["Valid", "Submitted", "Processing", "Archiving", "Cleanup", "Complete"];
+  checkIfValid(submission) {
+    const status = submission['submissionState'];
+    const validStates = ['Valid', 'Submitted', 'Processing', 'Archiving', 'Cleanup', 'Complete'];
     return (validStates.indexOf(status) >= 0);
   }
 
-  getProject(projectUuid){
+  getRelatedProject(projectUuid) {
     this.ingestService.getProjectByUuid(projectUuid)
       .subscribe(project => {
-        this.setProject(project);
+        this.setRelatedProject(project);
       });
   }
 
-  getSubmissionProject(id){
-    this.ingestService.getSubmissionProject(id)
-      .subscribe(project => {
-        this.setProject(project);
-      })
+  getSubmissionProject(id) {
+    this.ingestService.getSubmissionProject(id).subscribe(project => {
+      this.setProject(project);
+    });
+
+    this.ingestService.getRelatedProject(id).subscribe(project => {
+      this.setRelatedProject(project);
+    });
+
   }
 
   setProject(project) {
     this.project = project;
-    this.projectName = this.getProjectName();
-    this.projectUuid = this.getProjectUuid();
   }
 
-  getProjectName(){
-    return this.project && this.project['content'] ? this.project['content']['project_core']['project_title'] : '';
+  setRelatedProject(project) {
+    this.relatedProject = project;
+    this.relatedProjectName = this.getProjectName(project);
+    this.relatedProjectUuid = this.getProjectUuid(project);
   }
 
-  getProjectUuid() {
-    return this.project && this.project['uuid'] ? this.project['uuid']['uuid'] : '';
+  getProjectName(project) {
+    return project && project['content'] ? project['content']['project_core']['project_title'] : '';
   }
 
-  isStateSubmitted(state){
-    let submittedStates = [ "Submitted", "Processing" , "Archiving", "Cleanup", "Complete"];
+  getProjectUuid(project) {
+    return project && project['uuid'] ? project['uuid']['uuid'] : '';
+  }
+
+  isStateSubmitted(state) {
+    const submittedStates = ['Submitted', 'Processing', 'Archiving', 'Cleanup', 'Complete'];
     return (submittedStates.indexOf(state) >= 0);
   }
 
-  getLink(submissionEnvelope, linkName){
-    let links = submissionEnvelope['_links'];
-    return links && links[linkName]? links[linkName]['href'] : null;
+  getLink(submissionEnvelope, linkName) {
+    const links = submissionEnvelope['_links'];
+    return links && links[linkName] ? links[linkName]['href'] : null;
   }
 
   /**
@@ -155,63 +166,92 @@ export class SubmissionComponent implements OnInit {
    */
   getSubmissionStateChipClassName(submissionState: string): string {
 
-    if ( submissionState === 'Pending' || submissionState === 'Draft' ) {
+    if (submissionState === 'Pending' || submissionState === 'Draft') {
       return 'warning';
     }
 
-    if ( submissionState === 'Valid' ) {
+    if (submissionState === 'Valid') {
       return 'success';
     }
 
-    if ( submissionState === 'Validating' ) {
+    if (submissionState === 'Validating') {
       return 'info';
     }
 
-    if ( submissionState === 'Invalid' ) {
+    if (submissionState === 'Invalid') {
       return 'danger';
     }
 
-    if ( submissionState === 'Submitted' ) {
+    if (submissionState === 'Submitted') {
       return 'secondary';
     }
 
-    if ( submissionState === 'Processing' || submissionState === 'Cleanup' || submissionState === 'Archiving' ) {
+    if (submissionState === 'Processing' || submissionState === 'Cleanup' || submissionState === 'Archiving') {
       return 'warning-invert';
     }
 
-    if ( submissionState === 'Complete' ) {
+    if (submissionState === 'Complete') {
       return 'success-invert';
     }
 
     return '';
   }
 
+  onDeleteSubmission(submissionEnvelope: SubmissionEnvelope) {
+    const submissionId: String = this.getSubmissionId(submissionEnvelope);
+    const projectName = this.getProjectName(this.relatedProject);
+    const projectInfo = projectName ? `(${projectName})` : '';
+    const projectUrl = `/projects/detail?uuid=${this.getProjectUuid(this.relatedProject)}`;
+    const submissionUuid = submissionEnvelope['uuid']['uuid'];
+    const message = `This may take some time. Are you sure you want to delete the submission with UUID ${submissionUuid} ${projectInfo} ?`;
+    const messageOnSuccess = `The submission with UUID ${submissionUuid} ${projectInfo} was deleted!`;
+    const messageOnError = `An error has occurred while deleting the submission w/UUID ${submissionUuid} ${projectInfo}`;
+
+    if (confirm(message)) {
+      this.loaderService.display(true);
+      this.ingestService.deleteSubmission(submissionId).subscribe(
+        data => {
+          this.alertService.clear();
+          this.alertService.success('', messageOnSuccess);
+          this.loaderService.display(false);
+          this.router.navigateByUrl(projectUrl);
+        },
+        err => {
+          this.alertService.clear();
+          this.alertService.error(messageOnError, err);
+          console.log('error deleting submission', err);
+          this.loaderService.display(false);
+          this.router.navigateByUrl(projectUrl);
+        });
+    }
+  }
+
   private getSubmissionEnvelope() {
-    if(this.submissionEnvelopeId){
+    if (this.submissionEnvelopeId) {
       this.submissionEnvelope$ = this.ingestService.getSubmission(this.submissionEnvelopeId);
     } else if (this.submissionEnvelopeUuid) {
 
       this.submissionEnvelope$ = this.ingestService.getSubmissionByUuid(this.submissionEnvelopeUuid);
     } else {
-      this.submissionEnvelope$ = null
+      this.submissionEnvelope$ = null;
     }
 
-    if (this.submissionEnvelope$){
+    if (this.submissionEnvelope$) {
       this.submissionEnvelope$
         .subscribe(data => {
           this.submissionEnvelope = data;
-          this.submissionEnvelopeId = this.getSubmissionId(data)
+          this.submissionEnvelopeId = this.getSubmissionId(data);
           this.isValid = this.checkIfValid(data);
           this.submissionState = data['submissionState'];
-          this.isSubmitted = this.isStateSubmitted(data.submissionState)
+          this.isSubmitted = this.isStateSubmitted(data.submissionState);
           this.submitLink = this.getLink(data, 'submit');
           this.url = this.getLink(data, 'self');
         });
     }
   }
 
-  private getSubmissionId(submissionEnvelope){
-    let links = submissionEnvelope['_links'];
+  private getSubmissionId(submissionEnvelope) {
+    const links = submissionEnvelope['_links'];
     return links && links['self'] && links['self']['href'] ? links['self']['href'].split('/').pop() : '';
   }
 
@@ -223,10 +263,10 @@ export class SubmissionComponent implements OnInit {
           this.alertService.clear();
           if (this.submissionErrors.length > this.MAX_ERRORS) {
             const link = this.submissionEnvelope._links.submissionEnvelopeErrors.href;
-            const message = `Cannot show more than ${ this.MAX_ERRORS } errors.`;
+            const message = `Cannot show more than ${this.MAX_ERRORS} errors.`;
             this.alertService.error(
-              `${ this.submissionErrors.length - this.MAX_ERRORS } Other Errors`,
-              `${ message } <a href="${ link }">View all ${ this.submissionErrors.length } errors.</a>`,
+              `${this.submissionErrors.length - this.MAX_ERRORS} Other Errors`,
+              `${message} <a href="${link}">View all ${this.submissionErrors.length} errors.</a>`,
               false,
               false);
           }
@@ -247,47 +287,18 @@ export class SubmissionComponent implements OnInit {
       .subscribe(
         data => {
           this.manifest = data;
-          let actualLinks = this.manifest['actualLinks'];
-          let expectedLinks = this.manifest['expectedLinks'];
+          const actualLinks = this.manifest['actualLinks'];
+          const expectedLinks = this.manifest['expectedLinks'];
           if (!expectedLinks || (actualLinks == expectedLinks)) {
             this.isLinkingDone = true;
           }
         }, err => {
           this.isLinkingDone = false;
-          if (err instanceof HttpErrorResponse && err.status == 404 ){
+          if (err instanceof HttpErrorResponse && err.status == 404) {
             // do nothing, the endpoint throws error when no submission manifest is found
           } else {
-            console.log(err)
+            console.log(err);
           }
         });
-  }
-
-  onDeleteSubmission(submissionEnvelope: SubmissionEnvelope) {
-    let submissionId : String = this.getSubmissionId(submissionEnvelope);
-    let projectName = this.getProjectName();
-    let projectInfo = projectName ? `(${projectName})`: '';
-    let projectUrl = `/projects/detail?uuid=${this.getProjectUuid()}`;
-    let submissionUuid = submissionEnvelope['uuid']['uuid'];
-    let message = `This may take some time. Are you sure you want to delete the submission with UUID ${submissionUuid} ${projectInfo} ?`;
-    let messageOnSuccess = `The submission with UUID ${submissionUuid} ${projectInfo} was deleted!`;
-    let messageOnError = `An error has occurred while deleting the submission w/UUID ${submissionUuid} ${projectInfo}`;
-
-    if(confirm(message)){
-      this.loaderService.display(true);
-      this.ingestService.deleteSubmission(submissionId).subscribe(
-        data => {
-          this.alertService.clear();
-          this.alertService.success('', messageOnSuccess);
-          this.loaderService.display(false);
-          this.router.navigateByUrl(projectUrl);
-        },
-        err => {
-          this.alertService.clear();
-          this.alertService.error(messageOnError, err.error.message);
-          console.log('error deleting submission', err);
-          this.loaderService.display(false);
-          this.router.navigateByUrl(projectUrl);
-        });
-    }
   }
 }
