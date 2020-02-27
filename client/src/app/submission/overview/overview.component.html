@@ -30,7 +30,7 @@
       <span><p><a href="{{project?._links?.self?.href}}"><span class="oi oi-external-link"></span></a></p></span>
       <br/>
       <ng-container *ngIf="isLinkingDone">
-        <button mat-raised-button color="basic" (click)="downloadFile()"><span>Download spreadsheet</span></button>
+        <button mat-raised-button color="basic" (click)="downloadFile(submissionEnvelope?.uuid?.uuid)"><span>Download spreadsheet</span></button>
       </ng-container>
       <br/>
       <ng-content></ng-content>
