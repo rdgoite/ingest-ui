@@ -19,7 +19,7 @@ Loading project ...
         <th>Created</th>
         <th>Submission UUID</th>
         <th>Status</th>
-        <th></th>
+        <th>Actions</th>
       </tr>
       </thead>
       <tbody>
@@ -45,7 +45,10 @@ Loading project ...
           </div>
         </td>
         <td>
-          <button *ngIf="submissionEnvelope.open" mat-icon-button (click)="onDeleteSubmission(submissionEnvelope)">
+          <button mat-icon-button matTooltip="Download spreadsheet with uuid's" (click)="downloadFile(submissionEnvelope?.uuid?.uuid)">
+            <mat-icon>cloud_download</mat-icon>
+          </button>
+          <button *ngIf="submissionEnvelope.open" mat-icon-button (click)="onDeleteSubmission(submissionEnvelope)" matTooltip="Delete submission">
             <mat-icon>delete_forever</mat-icon>
           </button>
         </td>
