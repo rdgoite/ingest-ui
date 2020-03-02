@@ -43,6 +43,7 @@ export class ProjectComponent implements OnInit {
       this.setProjectData(projectData);
     }, error => {
       this.alertService.error('Project Not Found', `Project could not be found.`, true, true);
+      console.error('get project', error);
       this.router.navigate([`/projects/list`]);
     });
 
