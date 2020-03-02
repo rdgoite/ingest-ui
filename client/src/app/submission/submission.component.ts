@@ -15,31 +15,31 @@ import {LoaderService} from '../shared/services/loader.service';
   styleUrls: ['./submission.component.scss']
 })
 export class SubmissionComponent implements OnInit, OnDestroy {
-  private MAX_ERRORS = 9;
+  MAX_ERRORS = 9;
 
 
-  private submissionEnvelope$: Observable<any>;
-  private submissionEnvelope;
-  private submissionEnvelopeId: string;
-  private submissionEnvelopeUuid: string;
-  private submissionState: string;
+  submissionEnvelope$: Observable<any>;
+  submissionEnvelope;
+  submissionEnvelopeId: string;
+  submissionEnvelopeUuid: string;
+  submissionState: string;
 
-  private activeTab: string;
+  activeTab: string;
 
-  private isValid: boolean;
-  private isLinkingDone: boolean;
-  private isSubmitted: boolean;
-  private submitLink: string;
-  private url: string;
+  isValid: boolean;
+  isLinkingDone: boolean;
+  isSubmitted: boolean;
+  submitLink: string;
+  url: string;
 
-  private project: Object;
+  project: Object;
 
-  private relatedProject: Object;
-  private relatedProjectName: string;
-  private relatedProjectUuid: string;
+  relatedProject: Object;
+  relatedProjectName: string;
+  relatedProjectUuid: string;
 
-  private manifest: Object;
-  private submissionErrors: any[];
+  manifest: Object;
+  submissionErrors: any[];
 
   private alive: boolean;
   private pollInterval: number;
